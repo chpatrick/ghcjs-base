@@ -19,6 +19,9 @@ module GHCJS.Types ( JSVal
                    , toPtr
                    , fromPtr
                    , JSRef
+                   , MutabilityType(..)
+                   , Mutable
+                   , Immutable
                    ) where
 
 import Data.JSString.Internal.Type (JSString)
