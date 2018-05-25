@@ -42,7 +42,6 @@ import Data.Text (Text)
 import           Data.JSString.Text (textFromJSString)
 import qualified Data.JSString as JSS
 
-import JavaScript.JSON.Types.Internal ( SomeValue(..) )
 import JavaScript.TypedArray.Internal.Types ( SomeTypedArray(..) )
 import JavaScript.TypedArray.ArrayBuffer ( ArrayBuffer(..) )
 import JavaScript.TypedArray.ArrayBuffer.Internal ( SomeArrayBuffer(..) )
@@ -112,10 +111,6 @@ instance m ~ Immutable => ResponseType JSString where
 instance ResponseType Blob where
   getResponseTypeString _ = "blob"
   wrapResponseType        = SomeBlob
-
-instance m ~ Immutable => ResponseType (SomeValue m) where
-  getResponseTypeString _ = "json"
-  wrapResponseType        = SomeValue
 
 newtype JSFormData = JSFormData JSVal deriving (Typeable)
 

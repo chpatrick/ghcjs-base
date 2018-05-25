@@ -16,7 +16,6 @@
 
 module GHCJS.Marshal ( FromJSVal(..)
                      , ToJSVal(..)
-                     , toJSVal_aeson
                      , toJSVal_pure
                      ) where
 
@@ -24,7 +23,6 @@ import           Control.Applicative
 import           Control.Monad
 import           Control.Monad.Trans.Maybe (MaybeT(..), runMaybeT)
 
-import qualified Data.Aeson as AE
 import           Data.Attoparsec.Number (Number(..))
 import           Data.Bits ((.&.))
 import           Data.Char (chr, ord)
@@ -154,24 +152,6 @@ instance FromJSVal Double where
     {-# INLINE fromJSValUnchecked #-}
     fromJSVal = fromJSVal_pure
     {-# INLINE fromJSVal #-}
-instance FromJSVal AE.Value where
-    fromJSVal r = case jsonTypeOf r of
-            JSONNull    -> return (Just AE.Null)
-            JSONInteger -> liftM (AE.Number . flip scientific 0 . (toInteger :: Int -> Integer))
-                 <$> fromJSVal r
-            JSONFloat   -> liftM (AE.Number . (fromFloatDigits :: Double -> Scientific))
-                 <$> fromJSVal r
-            JSONBool    -> liftM AE.Bool  <$> fromJSVal r
-            JSONString  -> liftM AE.String <$> fromJSVal r
-            JSONArray   -> liftM (AE.Array . V.fromList) <$> fromJSVal r
-            JSONObject  -> do
-                props <- OI.listProps (OI.Object r)
-                runMaybeT $ do
-                    propVals <- forM props $ \p -> do
-                        v <- MaybeT (fromJSVal =<< OI.getProp p (OI.Object r))
-                        return (JSS.textFromJSString p, v)
-                    return (AE.Object (H.fromList propVals))
-    {-# INLINE fromJSVal #-}
 instance (FromJSVal a, FromJSVal b) => FromJSVal (a,b) where
     fromJSVal r = runMaybeT $ (,) <$> jf r 0 <*> jf r 1
     {-# INLINE fromJSVal #-}
@@ -204,9 +184,6 @@ jf r n = MaybeT $ do
 instance ToJSVal JSVal where
   toJSVal = toJSVal_pure
   {-# INLINE toJSVal #-}
-instance ToJSVal AE.Value where
-    toJSVal = toJSVal_aeson
-    {-# INLINE toJSVal #-}
 instance ToJSVal JSString where
     toJSVal = toJSVal_pure
     {-# INLINE toJSVal #-}
@@ -284,22 +261,4 @@ foreign import javascript unsafe "[$1,$2,$3,$4]"          arr4     :: JSVal -> J
 foreign import javascript unsafe "[$1,$2,$3,$4,$5]"       arr5     :: JSVal -> JSVal -> JSVal -> JSVal -> JSVal -> IO JSVal
 foreign import javascript unsafe "[$1,$2,$3,$4,$5,$6]"    arr6     :: JSVal -> JSVal -> JSVal -> JSVal -> JSVal -> JSVal -> IO JSVal
 foreign import javascript unsafe "[$1,$2,$3,$4,$5,$6,$7]" arr7     :: JSVal -> JSVal -> JSVal -> JSVal -> JSVal -> JSVal -> JSVal -> IO JSVal
-
-toJSVal_aeson :: AE.ToJSON a => a -> IO JSVal
-toJSVal_aeson x = cv (AE.toJSON x)
-  where
-    cv = convertValue
-
-    convertValue :: AE.Value -> IO JSVal
-    convertValue AE.Null       = return jsNull
-    convertValue (AE.String t) = return (pToJSVal t)
-    convertValue (AE.Array a)  = (\(AI.SomeJSArray x) -> x) <$>
-                                 (AI.fromListIO =<< mapM convertValue (V.toList a))
-    convertValue (AE.Number n) = toJSVal (realToFrac n :: Double)
-    convertValue (AE.Bool b)   = return (toJSBool b)
-    convertValue (AE.Object o) = do
-      obj@(OI.Object obj') <- OI.create
-      mapM_ (\(k,v) -> convertValue v >>= \v' -> OI.setProp (JSS.textToJSString k) v' obj) (H.toList o)
-      return obj'
-
 
